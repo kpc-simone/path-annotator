@@ -25,24 +25,29 @@ def identifyRotation(frame):
     print('Use LEFT and RIGHT arrow keys to rotate view 90 degrees (COUNTER)CLOCKWISE')
     print('Press ESC to finalize rotation')    
     while(True):
+        #print('ready for input')
         cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
         cv2.imshow("frame",rotated)
-        cv2.waitKey(100)
+        cv2.waitKey(1)
         key = ord(getch())
+        #print(key)
         if key == 27: #ESC
             print('esc key pressed, exiting program')
             break
 
         elif key == 224: #Special keys (arrows, f keys, ins, del, etc.)
-            key = ord(getch())
-            if key == 75: #Left arrow
-                rotation_factor -= 1
-                print('rotation factor = {}'.format(rotation_factor))
-                rotated = cv2.rotate(rotated,cv2.ROTATE_90_COUNTERCLOCKWISE)
-            elif key == 77: #Right arrow
-                rotation_factor += 1
-                print('rotation factor = {}'.format(rotation_factor))
-                rotated = cv2.rotate(rotated,cv2.ROTATE_90_CLOCKWISE)      
+            continue#key = ord(getch())
+        
+        elif key == 75: #Left arrow
+            rotation_factor -= 1
+            print('rotation factor = {}'.format(rotation_factor))
+            rotated = cv2.rotate(rotated,cv2.ROTATE_90_COUNTERCLOCKWISE)
+            key = 0
+        elif key == 77: #Right arrow
+            rotation_factor += 1
+            print('rotation factor = {}'.format(rotation_factor))
+            rotated = cv2.rotate(rotated,cv2.ROTATE_90_CLOCKWISE)      
+            key = 0
         cv2.destroyAllWindows()
     return rotation_factor
 
@@ -54,20 +59,25 @@ def selectBrightness(in_frame):
         frame = increaseBrightness(in_frame,factor)
         cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
         cv2.imshow("frame",frame)
-        cv2.waitKey(100)
+        cv2.waitKey(1)
         key = ord(getch())
         if key == 27: #ESC
             print('esc key pressed, exiting program')
             break
 
         elif key == 224: #Special keys (arrows, f keys, ins, del, etc.)
-            key = ord(getch())
-            if key == 80: #Down arrow
-                factor *= 0.5
-                print('factor = {}'.format(factor))
-            elif key == 72: #Up arrow
-                factor += 1
-                print('factor = {}'.format(factor))
+            continue
+            
+        elif key == 80: #Down arrow
+            factor *= 0.5
+            print('factor = {}'.format(factor))
+            key = 0
+            
+        elif key == 72: #Up arrow
+            factor += 1
+            print('factor = {}'.format(factor))
+            key = 0
+            
         cv2.destroyAllWindows()
     return factor
 
@@ -82,9 +92,9 @@ def selectPoint(event, x, y, flags, param):
             n_xs.append(x)
             n_ys.append(y)
             
-            xc,yc = correctPosition(x,y,transformation_params)
-            n_xsc.append(xc)
-            n_ysc.append(yc)
+            pc = correctPosition(np.array([[x,y]]),transformation_params)
+            n_xsc.append(pc[0]/1000)        # convert from mm to m
+            n_ysc.append(pc[1]/1000)
             points_selected += 1
     
     elif points_selected == 1:        
@@ -93,9 +103,9 @@ def selectPoint(event, x, y, flags, param):
             t_xs.append(x)
             t_ys.append(y)
             
-            xc,yc = correctPosition(x,y,transformation_params)
-            t_xsc.append(xc)
-            t_ysc.append(yc)
+            pc = correctPosition(np.array([[x,y]]),transformation_params)
+            t_xsc.append(pc[0]/1000)
+            t_ysc.append(pc[1]/1000)
             
             # reset
             points_selected += 1

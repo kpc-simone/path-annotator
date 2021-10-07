@@ -1,38 +1,25 @@
 # transformation.py
+import numpy as np
+import cv2
 
-def getTransformParams(points,arena_size):
+def getTransformParams(rect,known_dims):
     
-    #correct for perspective distortion
-    pts = {
-    'back left'     : points[0],
-    'back right'    : points[1],
-    'front right'   : points[2],
-    'front left'    : points[3],
-    }
-       
-    xform = {
-    'x0'        : ( (pts['front right'][0] + pts['front left'][0])/2 + (pts['back right'][0] + pts['back left'][0])/2 )/2,
-    'ymin'      : (pts['back left'][1] + pts['back right'][1])/2,
-    'y0_max'    : ( (pts['front left'][1] - pts['back left'][1]) + (pts['front right'][1] - pts['back right'][1]) )/2,
-    'mx1'       : arena_size[0]/(pts['back right'][0] - pts['back left'][0]),
-    'mx2'       : arena_size[0]/(pts['front right'][0] - pts['front left'][0]),
-    'my'        : arena_size[1]/( ( (pts['front left'][1] - pts['back left'][1]) + (pts['front right'][1] - pts['back right'][1]) )/2 ),    
-    }
+    maxWidth, maxHeight = known_dims
     
-    print('transformation parameters: \n'.format(xform))
+    # construct the set of destination points to obtain top-down view)
+    dst = np.float32([ 
+        [int(-maxWidth/2), 0],
+        [int(maxWidth/2) - 1, 0],
+        [int(maxWidth/2) - 1, int(maxHeight) - 1],
+        [int(-maxWidth/2) - 1, int(maxHeight) - 1]])
     
-    return xform
+    # compute the perspective transform matrix
+    H = cv2.findHomography(rect, dst,cv2.RANSAC,5.0)[0]
+    return H
     
-def correctPosition(xpos,ypos,xform):
+def correctPosition(point,H):
     
-    x0 = xform['x0']
-    ymin = xform['ymin']
-    y0_max = xform['y0_max']
-    mx1 = xform['mx1']
-    mx2 = xform['mx2']
-    my = xform['my']    
-
-    xcorr = (xpos - x0) * (mx2 + (mx1-mx2) * (y0_max-((ypos - ymin)))/y0_max)
-    ycorr = (ypos - ymin) * my
+    point_corrected = np.zeros_like(point)
+    point_corrected = np.squeeze(np.squeeze(cv2.perspectiveTransform(np.float32([point]), H),axis=0),axis=0)
     
-    return [xcorr,ycorr]
+    return point_corrected

@@ -8,6 +8,7 @@ import progressbar
 import cv2 as cv2
 import sys,os
 import math
+import tracemalloc
 
 sys.path.append(os.path.join(os.path.dirname(__file__),'src'))
 from image_processing import *
@@ -46,8 +47,8 @@ while(True):
     final_frame = increaseBrightness(rotated_frame,factor=brightness_factor)
     selectArenaCorners(final_frame)
 
-    arenaSize=[0.3,0.5]
-    transformation_params = getTransformParams(arenaCorners,arenaSize)
+    arenaSize = (300,500)
+    transformation_params = getTransformParams(np.float32([arenaCorners]),arenaSize)
 
     trials = asdf['trial'].tolist()
     outcomes = asdf['defensive strategy'].tolist()

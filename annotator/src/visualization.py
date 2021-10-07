@@ -14,10 +14,10 @@ def draw_box(ax,bb):
     ax.add_patch(box)    
 
 arena = {
-'xmin'      : -0.15,
+'xmin'      : -0.150,
 'ymin'      : 0,
-'width'     : 0.3,
-'height'    : 0.5,
+'width'     : 0.300,
+'height'    : 0.500,
 }
 
 behavior_colors = {
@@ -38,9 +38,9 @@ def plot_trajectory(xs,ys,outcome):
     
     for ax in axes.ravel():
         draw_box(ax,arena)
-        ax.set_xlim(-0.20,0.20)
-        ax.set_ylim(0.55,-0.05)
-        shelter = plt.Rectangle((-0.15, 0), 0.160, 0.120,facecolor=behavior_colors['hide'], alpha=0.5)
+        ax.set_xlim(-0.200,0.200)
+        ax.set_ylim(0.550,-0.050)
+        shelter = plt.Rectangle((-0.150, 0), 0.160, 0.120,facecolor=behavior_colors['hide'], alpha=0.5)
         ax.add_patch(shelter)
         ax.set_axis_off()    
     

@@ -10,6 +10,9 @@ import sys,os
 import math
 import tracemalloc
 
+if __name__ == '__main__':
+    skip_frames = int(sys.argv[1])
+
 sys.path.append(os.path.join(os.path.dirname(__file__),'src'))
 from image_processing import *
 from visualization import *
@@ -69,6 +72,7 @@ while(True):
             pos_f = float(asdf[asdf['trial'] == trial]['shadowOFF-abs'] + 1.0)
         
         vidcap.set(cv2.CAP_PROP_POS_FRAMES,int(pos_0*FPS))
+        index = vidcap.get(cv2.CAP_PROP_POS_FRAMES)
         print('skipping to {} trial {} at {}'.format(outcome,trial,vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS))
         out_filename = '{}-{}-{}-d{}-t{}-{}'.format(phenotype,sex,animal,day,trial,outcome)
         with progressbar.ProgressBar( max_value = pos_f - pos_0 ) as pbar:
@@ -84,13 +88,19 @@ while(True):
                 rotated_frame = changeRotation(frame,rotation_factor)
                 final_frame = increaseBrightness(rotated_frame,factor=brightness_factor)
                 labelPositions(final_frame,transformation_params)
+                
+                index += skip_frames
+                if index < vidcap.get(cv2.CAP_PROP_FRAME_COUNT):
+                    vidcap.set(cv2.CAP_PROP_POS_FRAMES, index)
+                else:
+                    vidcap.release()
 
         b,a = signal.butter(5,0.5)
         out_data = {
-            'n-xpos'      : signal.filtfilt(b,a,np.asarray(n_xsc)),
-            'n-ypos'      : signal.filtfilt(b,a,np.asarray(n_ysc)),
-            't-xpos'      : signal.filtfilt(b,a,np.asarray(t_xsc)),
-            't-ypos'      : signal.filtfilt(b,a,np.asarray(t_ysc)),
+            'n-xpos'      : signal.filtfilt(b,a,np.asarray(n_xsc),padlen=2),
+            'n-ypos'      : signal.filtfilt(b,a,np.asarray(n_ysc),padlen=2),
+            't-xpos'      : signal.filtfilt(b,a,np.asarray(t_xsc),padlen=2),
+            't-ypos'      : signal.filtfilt(b,a,np.asarray(t_ysc),padlen=2),
         }
         ts = np.linspace( pos_0 - t0, pos_f - t0, len(out_data['n-xpos']) )
         out_data['time'] = ts

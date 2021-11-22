@@ -32,7 +32,7 @@ behavior_colors = {
 
 def plot_trajectory(xs,ys,outcome):
 
-    fig, axes = plt.subplots(1,1,squeeze=False)
+    fig, axes = plt.subplots(1,1,squeeze=False,figsize=(3,5))
     
     axes[0,0].plot(xs,ys,color=behavior_colors[outcome],linewidth=1.5,alpha=0.5)
     

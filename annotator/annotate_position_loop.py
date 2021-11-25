@@ -142,6 +142,6 @@ while(True):
         t_ysc.clear()
     
     print('completed annotation for all trials in this assay.')
+    arenaCorners.clear()
     if input('select another video to annotate? y / [n]') != 'y':
-        arenaCorners.clear()
         break

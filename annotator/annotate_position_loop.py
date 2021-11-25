@@ -12,6 +12,8 @@ import tracemalloc
 
 if __name__ == '__main__':
     skip_frames = int(sys.argv[1])
+    depth = float(sys.argv[2])
+    width = float(sys.argv[3])
 
 sys.path.append(os.path.join(os.path.dirname(__file__),'src'))
 from image_processing import *
@@ -50,7 +52,7 @@ while(True):
     final_frame = increaseBrightness(rotated_frame,factor=brightness_factor)
     selectArenaCorners(final_frame)
 
-    arenaSize = (300,500)
+    arenaSize = (width,depth)
     transformation_params = getTransformParams(np.float32([arenaCorners]),arenaSize)
 
     trials = asdf['trial'].tolist()
@@ -77,8 +79,11 @@ while(True):
         out_filename = '{}-{}-{}-d{}-t{}-{}'.format(phenotype,sex,animal,day,trial,outcome)
         with progressbar.ProgressBar( max_value = pos_f - pos_0 ) as pbar:
             while ( vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS < pos_f ):
-                pbar.update( vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS - pos_0 )
-                   
+                try:
+                    pbar.update( vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS - pos_0 )
+                except:
+                    pass
+                    
                 success,frame = vidcap.read()
 
                 if frame is None:
@@ -124,7 +129,7 @@ while(True):
         df.to_csv('../annotated-paths/{}.csv'.format(out_filename))
         
         print(df.head())
-        plot_trajectory(df['n-xpos'],df['n-ypos'],outcome)        
+        plot_trajectory(df['n-xpos'],df['n-ypos'],outcome,arenaSize)        
         
         # clear data for next trial
         n_xs.clear()

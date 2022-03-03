@@ -11,13 +11,14 @@ import math
 import tracemalloc
 
 if __name__ == '__main__':
-    skip_frames = int(sys.argv[1])
+    timing = sys.argv[1]
     depth = float(sys.argv[2])
     width = float(sys.argv[3])
 
 sys.path.append(os.path.join(os.path.dirname(__file__),'src'))
 from image_processing import *
 from visualization import *
+from incrementing import *
 from user_input import *
 
 print('select csv file containing stimulus and behavioral timings')
@@ -37,6 +38,7 @@ while(True):
     day = int(input('enter test day: '))
     asdf = ktdf[ktdf['animal'] == animal]
     asdf = asdf[asdf['day'] == day]
+
     phenotype = asdf['phenotype'].iloc[0]
     sex = asdf['sex'].iloc[0]
     pos_0 = float(asdf['shadowON-abs'].iloc[0])
@@ -55,28 +57,21 @@ while(True):
     arenaSize = (width,depth)
     transformation_params = getTransformParams(np.float32([arenaCorners]),arenaSize)
 
-    trials = asdf['trial'].tolist()
-    outcomes = asdf['defensive strategy'].tolist()
-
-    for trial,outcome in zip(trials,outcomes):
+    for index,row in enumerate(asdf.iterrows()):
         
-        if outcome == 'escape':    
-            t0 = float(asdf[asdf['trial'] == trial]['run-abs'])
-            pos_0 = float(t0 - 0.5)
-            pos_f = float(asdf[asdf['trial'] == trial]['hide-abs'] + 1.0)
-        elif outcome == 'panic':           
-            t0 = float(asdf[asdf['trial'] == trial]['run-abs'])
-            pos_0 = float(t0 - 0.5)
-            pos_f = float(asdf[asdf['trial'] == trial]['freeze-start-abs'] + 1.0)
-        elif outcome == 'freeze':           
-            t0 = float(asdf[asdf['trial'] == trial]['shadowON-abs'])
-            pos_0 = float(t0 - 0.5)
-            pos_f = float(asdf[asdf['trial'] == trial]['shadowOFF-abs'] + 1.0)
+        # TODO add 'timing' argument to pass to get_interval
+        t0,pos_0,pos_f,outcome = get_interval(asdf,'trial',index+1,timing=timing)
         
         vidcap.set(cv2.CAP_PROP_POS_FRAMES,int(pos_0*FPS))
-        index = vidcap.get(cv2.CAP_PROP_POS_FRAMES)
-        print('skipping to {} trial {} at {}'.format(outcome,trial,vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS))
-        out_filename = '{}-{}-{}-d{}-t{}-{}'.format(phenotype,sex,animal,day,trial,outcome)
+        vid_index = vidcap.get(cv2.CAP_PROP_POS_FRAMES)
+        print('skipping to {} trial {} at {}'.format(outcome,index+1,vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS))
+        out_filename = '{}-{}-{}-d{}-t{}-{}'.format(phenotype,sex,animal,day,index+1,outcome)
+        
+        ts = np.linspace( pos_0 - t0, pos_f - t0, int( (pos_f-pos_0) * FPS + 1) )
+        
+        clear_annotations(size=len(ts))
+        reset_playback_control()
+        
         with progressbar.ProgressBar( max_value = pos_f - pos_0 ) as pbar:
             while ( vidcap.get(cv2.CAP_PROP_POS_FRAMES)/FPS < pos_f ):
                 try:
@@ -92,29 +87,38 @@ while(True):
                 # increase contrast for viewing
                 rotated_frame = changeRotation(frame,rotation_factor)
                 final_frame = increaseBrightness(rotated_frame,factor=brightness_factor)
-                labelPositions(final_frame,transformation_params)
+                skip_frames, delta_index = labelPositions(final_frame,transformation_params)
                 
-                index += skip_frames
-                if index < vidcap.get(cv2.CAP_PROP_FRAME_COUNT):
-                    vidcap.set(cv2.CAP_PROP_POS_FRAMES, index)
+                vid_index_old = vid_index
+                vid_index += skip_frames + delta_index*skip_frames
+                # print('old vid_index: ', vid_index_old, 
+                        # 'delta_index: ', delta_index,
+                        # 'skip_frames: ', skip_frames,      
+                        # 'new vid_index: ', vid_index)
+                if vid_index < vidcap.get(cv2.CAP_PROP_FRAME_COUNT):
+                    vidcap.set(cv2.CAP_PROP_POS_FRAMES, vid_index)
                 else:
                     vidcap.release()
 
-        b,a = signal.butter(5,0.5)
-        out_data = {
-            'n-xpos'      : signal.filtfilt(b,a,np.asarray(n_xsc),padlen=2),
-            'n-ypos'      : signal.filtfilt(b,a,np.asarray(n_ysc),padlen=2),
-            't-xpos'      : signal.filtfilt(b,a,np.asarray(t_xsc),padlen=2),
-            't-ypos'      : signal.filtfilt(b,a,np.asarray(t_ysc),padlen=2),
-        }
-        ts = np.linspace( pos_0 - t0, pos_f - t0, len(out_data['n-xpos']) )
+        out_data = {}
         out_data['time'] = ts
         
-        #for key,values in out_data.items():
-        #    print(key,": ",len(values))
-
+        n_xsc, n_ysc, t_xsc, t_ysc = get_annotation_corrected()
+        #print('nosepath in main script', n_xsc)
+        out_data['n-xpos'] = n_xsc
+        out_data['n-ypos'] = n_ysc
+        out_data['t-xpos'] = t_xsc
+        out_data['t-ypos'] = t_ysc
+        
         df = pd.DataFrame(data=out_data)        
-        df.interpolate(method='linear')
+        df.interpolate(method='linear',inplace=True)
+        
+        b,a = signal.butter(5,0.5)
+        df['n-xpos'] = signal.filtfilt(b,a,df['n-xpos'],padlen=2)
+        df['n-ypos'] = signal.filtfilt(b,a,df['n-ypos'],padlen=2)
+        df['t-xpos'] = signal.filtfilt(b,a,df['t-xpos'],padlen=2)
+        df['t-ypos'] = signal.filtfilt(b,a,df['t-ypos'],padlen=2)
+
         df['c-xpos'] = ( df['n-xpos'] + df['t-xpos'] ) / 2
         df['c-ypos'] = ( df['n-ypos'] + df['t-ypos'] ) / 2
         df['c-xvel'] = df['c-xpos'].diff() * FPS
@@ -128,18 +132,12 @@ while(True):
         
         df.to_csv('../annotated-paths/{}.csv'.format(out_filename))
         
-        print(df.head())
-        plot_trajectory(df['n-xpos'],df['n-ypos'],outcome,arenaSize)        
+        print(df.head(10))
+        print(df.tail(10))
+        plot_trajectory(df['n-xpos'],df['n-ypos'],outcome,arenaSize)     
         
-        # clear data for next trial
-        n_xs.clear()
-        n_ys.clear()
-        n_xsc.clear()
-        n_ysc.clear()
-        t_xs.clear()
-        t_ys.clear()
-        t_xsc.clear()
-        t_ysc.clear()
+        clear_annotations(size=len(ts))
+        reset_playback_control()
     
     print('completed annotation for all trials in this assay.')
     arenaCorners.clear()

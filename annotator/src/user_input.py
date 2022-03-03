@@ -1,14 +1,26 @@
 # user_input.py
 
-n_xs = []
-n_ys = []
-n_xsc = []
-n_ysc = []
+import numpy as np
 
-t_xs = []
-t_ys = []
-t_xsc = []
-t_ysc = []
+lbl_idx = 0
+delta_index = 0
+skip_frames = 1
+
+clear = np.empty( 300 )
+clear[:] = np.NaN
+n_xs = np.copy(clear)
+n_ys = np.copy(clear)
+t_xs = np.copy(clear)
+t_ys = np.copy(clear)
+
+n_xsc = np.copy(clear)
+n_ysc = np.copy(clear)
+t_xsc = np.copy(clear)
+t_ysc = np.copy(clear)
+
+NEXT = 9
+GO_BACK = 96
+SKIP_FRAMES_KEYS = [key for key in np.arange(49,57)]
 
 arenaCorners = []
 points_selected = 0 
@@ -84,65 +96,121 @@ def selectBrightness(in_frame):
 def selectPoint(event, x, y, flags, param):
 
     transformation_params = param
+    global lbl_idx
     global points_selected
+    global n_xs,n_ys,t_xs,t_ys
+    global n_xsc,n_ysc,t_xsc,t_ysc
     
     if points_selected == 0:
         if event == cv2.EVENT_LBUTTONDOWN:
+            n_xs[lbl_idx] = int(x)
+            n_ys[lbl_idx] = int(y)
             
-            n_xs.append(x)
-            n_ys.append(y)
-            
+            # get perspective-distortion correction position
             pc = correctPosition(np.array([[x,y]]),transformation_params)
-            n_xsc.append(pc[0]/1000)        # convert from mm to m
-            n_ysc.append(pc[1]/1000)
+            n_xsc[lbl_idx] = pc[0]/1000        # convert from mm to m
+            n_ysc[lbl_idx] = pc[1]/1000
             points_selected += 1
     
     elif points_selected == 1:        
         if event == cv2.EVENT_LBUTTONDOWN:
-            
-            t_xs.append(x)
-            t_ys.append(y)
+            t_xs[lbl_idx] = int(x)
+            t_ys[lbl_idx] = int(y)
             
             pc = correctPosition(np.array([[x,y]]),transformation_params)
-            t_xsc.append(pc[0]/1000)
-            t_ysc.append(pc[1]/1000)
+            t_xsc[lbl_idx] = pc[0]/1000
+            t_ysc[lbl_idx] = pc[1]/1000
             
             # reset
             points_selected += 1
-  
+            
+def get_annotation_corrected():
+    global n_xsc,n_ysc,t_xsc,t_ysc
+    
+    #print('nosepath X in get_annotation_corrected',n_xsc)
+    return n_xsc,n_ysc,t_xsc,t_ysc
+ 
+def clear_annotations(size=300):
+    
+    global n_xs,n_ys,t_xs,t_ys
+    global n_xsc,n_ysc,t_xsc,t_ysc
+    
+    # clear data for next trial
+    reset = np.empty( size )
+    reset[:] = np.NaN
+    
+    n_xs = np.copy(reset)
+    n_ys = np.copy(reset)
+    t_xs = np.copy(reset)
+    t_ys = np.copy(reset)
+    
+    n_xsc = np.copy(reset)
+    n_ysc = np.copy(reset)
+    t_xsc = np.copy(reset)
+    t_ysc = np.copy(reset) 
+
+def reset_playback_control():
+
+    global lbl_idx, skip_frames,delta_index
+    lbl_idx = 0
+    skip_frames = 1
+    delta_index = 0
+ 
 def labelPositions(frame,transformation_params):
     gray = cv2.cvtColor(cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY),cv2.COLOR_GRAY2BGR)
     points_overlay = gray.copy()
     
-    if len(n_xs) > 0:
+    global lbl_idx
+    if lbl_idx > 0:
         cmap_n = cm.get_cmap('autumn')
-        for idx,(x,y) in enumerate(zip(n_xs,n_ys)):
-            rgba = cmap_n(idx / len(n_xs) )
-            color = [ c*255 for c in rgba[-2::-1] ]
-            #print('head',color)
-            cv2.circle(points_overlay,(x,y),5,color,-1)
+        #print(n_xs,n_xs[~np.isnan(n_xs)])
+        for idx,(x,y) in enumerate(zip(n_xs[~np.isnan(n_xs)],n_ys[~np.isnan(n_ys)])):
+            rgba = cmap_n(idx / len(n_xs[~np.isnan(n_xs)]) )
+            color = [ int(c*255) for c in rgba[-2::-1] ]
+            cv2.circle(points_overlay,(int(x),int(y)),5,color,-1)
     
-    if len(t_xs) > 0:
         cmap_t = cm.get_cmap('winter')
-        for idx,(x,y) in enumerate(zip(t_xs,t_ys)):
-            rgba = cmap_t(idx / len(t_xs) )
-            color = [ c*255 for c in rgba[-2::-1] ]
-            #print('tail',color)
-            cv2.circle(points_overlay,(x,y),5,color,-1)
+        for idx,(x,y) in enumerate(zip(t_xs[~np.isnan(t_xs)],t_ys[~np.isnan(t_ys)])):
+            rgba = cmap_t(idx / len(t_xs[~np.isnan(t_xs)]) )
+            color = [ int(c*255) for c in rgba[-2::-1] ]
+            cv2.circle(points_overlay,(int(x),int(y)),5,color,-1)
         
     alpha = 0.5
     gray_overlay = cv2.addWeighted(points_overlay,alpha,gray,1-alpha,gamma=0)
     cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
     
-    global points_selected
+    global points_selected, skip_frames, delta_index
     while(points_selected < 2):
         cv2.imshow("frame",gray_overlay)
-        cv2.setMouseCallback("frame",selectPoint,transformation_params)
         
-        # wait for enter key to be pressed
-        cv2.waitKey(100)
+        input_key = cv2.waitKeyEx(100)
+
+        if input_key == NEXT:
+            print('received a next command')
+            delta_index = 1
+            break
+        elif input_key == GO_BACK:
+            print('received a go back command')
+            delta_index = -2
+            break
+        elif input_key in SKIP_FRAMES_KEYS:
+            print('received a skip frames change key')
+            skip_frames = input_key - 48
+            break
+        
+        cv2.setMouseCallback("frame",selectPoint,transformation_params)
+        delta_index = 0
+        
+    lbl_idx_old = lbl_idx
+    lbl_idx += delta_index * skip_frames + skip_frames
+    # print('old lbl_idx: ', lbl_idx_old, 
+            # 'delta_index: ', delta_index,
+            # 'skip_frames: ', skip_frames,
+            # 'new lbl_idx: ', lbl_idx)
+    
     points_selected = 0   
-    cv2.destroyAllWindows()    
+    cv2.destroyAllWindows()   
+    return skip_frames,delta_index
     
 def selectCorner(event, x, y, flags, param):
     global arenaCorners

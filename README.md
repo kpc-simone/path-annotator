@@ -19,7 +19,7 @@ Tool for manually-annotating trajectories during defensive behaviors and subsequ
 ### Run the script and link timing data
 
 ```
-python annotate_position_loop.py 500 300
+python annotate_position_loop.py full 500 300
 ```
 
 Dialog windows will prompt you to select
